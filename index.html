@@ -24,7 +24,7 @@
 
         body {
             font-family: 'Fredoka', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #01092e 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -530,29 +530,154 @@
 
         @media (max-width: 768px) {
             .game-title {
-                font-size: 2.5rem;
+                font-size: 2rem;
+                text-shadow: 2px 2px 0 #E63946, 4px 4px 0 rgba(0,0,0,0.3);
+            }
+
+            .room-info {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+
+            .connection-status {
+                top: 10px;
+                right: 10px;
+                padding: 8px 12px;
+                font-size: 0.85rem;
+            }
+
+            .status-dot {
+                width: 8px;
+                height: 8px;
+            }
+
+            .start-screen {
+                padding: 30px 20px;
+                max-width: 90%;
+            }
+
+            .start-screen h2 {
+                font-size: 1.8rem;
+            }
+
+            .btn {
+                padding: 12px 25px;
+                font-size: 1rem;
+                width: 100%;
+                margin: 5px 0;
+            }
+
+            .waiting-room {
+                padding: 30px 20px;
+                max-width: 90%;
+            }
+
+            .room-code-display {
+                font-size: 2rem;
+                letter-spacing: 3px;
             }
 
             .game-area {
                 flex-direction: column;
-                gap: 30px;
+                gap: 20px;
+                padding: 20px;
             }
 
             .players-info {
                 flex-direction: column;
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+
+            .player-card {
+                padding: 15px;
+            }
+
+            .player-name {
+                font-size: 1.2rem;
+            }
+
+            .player-cards-count {
+                font-size: 1.5rem;
             }
 
             .cards-container {
-                gap: 10px;
+                gap: 8px;
             }
 
             .card {
-                width: 80px;
-                height: 120px;
+                width: 70px;
+                height: 105px;
+                padding: 10px;
             }
 
             .card-value {
-                font-size: 1.8rem;
+                font-size: 1.5rem;
+            }
+
+            .card-corner {
+                font-size: 0.9rem;
+            }
+
+            .deck-pile {
+                width: 90px;
+                height: 135px;
+                font-size: 2.5rem;
+            }
+
+            .deck-pile::before {
+                width: 90px;
+                height: 135px;
+            }
+
+            .player-hand {
+                padding: 20px 15px;
+            }
+
+            .hand-title {
+                font-size: 1.2rem;
+            }
+
+            .game-status {
+                font-size: 1.2rem;
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+
+            .uno-button {
+                bottom: 15px;
+                right: 15px;
+                padding: 15px 30px;
+                font-size: 1.5rem;
+            }
+
+            .color-selector {
+                padding: 25px;
+                width: 90%;
+                max-width: 350px;
+            }
+
+            .color-selector h3 {
+                font-size: 1.2rem;
+            }
+
+            .color-option {
+                width: 70px;
+                height: 70px;
+            }
+
+            .winner-content {
+                padding: 40px 30px;
+                width: 90%;
+                max-width: 400px;
+            }
+
+            .winner-content h2 {
+                font-size: 2.5rem;
+            }
+
+            .winner-content p {
+                font-size: 1.5rem !important;
             }
         }
     </style>
