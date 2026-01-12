@@ -11,7 +11,7 @@ const io = socketIo(server, {
     }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 const rooms = new Map();
 
@@ -62,40 +62,22 @@ function getPlayableCards(hand, topCard, currentColor) {
 
 function initializeGame(room) {
     room.deck = createDeck();
-    room.playerHands = [];
-    
-    room.players.forEach((player, index) => {
-        if (player) {
-            room.playerHands[index] = [];
-        } else {
-            room.playerHands[index] = null;
-        }
-    });
+    room.playerHands = [[], []];
     
     for (let i = 0; i < 7; i++) {
-        room.players.forEach((player, index) => {
-            if (player && room.playerHands[index]) {
-                room.playerHands[index].push(room.deck.pop());
-            }
-        });
+        room.playerHands[0].push(room.deck.pop());
+        room.playerHands[1].push(room.deck.pop());
     }
     
     let firstCard = room.deck.pop();
-    while (firstCard.color === 'wild' || firstCard.value === 'skip' || 
-           firstCard.value === 'reverse' || firstCard.value === '+2') {
+    while (firstCard.color === 'wild') {
         room.deck.unshift(firstCard);
         firstCard = room.deck.pop();
     }
     
     room.discardPile = [firstCard];
     room.currentColor = firstCard.color;
-    
-    let startPlayer = 0;
-    while (!room.players[startPlayer]) {
-        startPlayer = (startPlayer + 1) % room.maxPlayers;
-    }
-    room.currentPlayer = startPlayer;
-    room.direction = 1;
+    room.currentPlayer = 0;
     room.gameStarted = true;
     
     broadcastGameState(room);
@@ -103,7 +85,7 @@ function initializeGame(room) {
 
 function broadcastGameState(room) {
     room.players.forEach((player, index) => {
-        if (player && player.socketId && room.playerHands[index]) {
+        if (player.socketId) {
             const topCard = room.discardPile[room.discardPile.length - 1];
             const playableCards = getPlayableCards(
                 room.playerHands[index], 
@@ -112,94 +94,59 @@ function broadcastGameState(room) {
             );
             
             io.to(player.socketId).emit('gameState', {
-                players: room.players.map((p, i) => p ? {
+                players: room.players.map((p, i) => ({
                     name: p.name,
-                    cardCount: room.playerHands[i] ? room.playerHands[i].length : 0
-                } : null),
+                    cardCount: room.playerHands[i].length
+                })),
                 currentPlayer: room.currentPlayer,
                 topCard: topCard,
                 currentColor: room.currentColor,
                 myHand: room.playerHands[index],
-                playableCards: playableCards,
-                direction: room.direction
+                playableCards: playableCards
             });
         }
     });
 }
 
 function handleSpecialCard(room, card) {
-    const activePlayerCount = room.players.filter(p => p).length;
+    const opponent = room.currentPlayer === 0 ? 1 : 0;
     
-    if (card.value === 'skip') {
-        nextPlayer(room);
-    } else if (card.value === 'reverse') {
-        if (activePlayerCount === 2) {
-            nextPlayer(room);
-        } else {
-            room.direction *= -1;
-        }
-    } else if (card.value === '+2') {
-        const nextPlayerIndex = getNextPlayerIndex(room);
+    if (card.value === '+2') {
         for (let i = 0; i < 2; i++) {
-            if (room.deck.length > 0 && room.playerHands[nextPlayerIndex]) {
-                room.playerHands[nextPlayerIndex].push(room.deck.pop());
+            if (room.deck.length > 0) {
+                room.playerHands[opponent].push(room.deck.pop());
             }
         }
-        nextPlayer(room);
     } else if (card.value === 'wild+4') {
-        const nextPlayerIndex = getNextPlayerIndex(room);
         for (let i = 0; i < 4; i++) {
-            if (room.deck.length > 0 && room.playerHands[nextPlayerIndex]) {
-                room.playerHands[nextPlayerIndex].push(room.deck.pop());
+            if (room.deck.length > 0) {
+                room.playerHands[opponent].push(room.deck.pop());
             }
         }
-        nextPlayer(room);
     }
 }
 
-function getNextPlayerIndex(room) {
-    let nextIndex = room.currentPlayer;
-    let attempts = 0;
-    const maxAttempts = room.maxPlayers;
+function nextTurn(room) {
+    const topCard = room.discardPile[room.discardPile.length - 1];
     
-    do {
-        nextIndex = (nextIndex + room.direction + room.maxPlayers) % room.maxPlayers;
-        attempts++;
-        
-        if (attempts > maxAttempts) {
-            return room.currentPlayer;
-        }
-    } while (!room.players[nextIndex]);
-    
-    return nextIndex;
-}
-
-function nextPlayer(room) {
-    room.currentPlayer = getNextPlayerIndex(room);
+    if (topCard.value === 'skip' || topCard.value === 'reverse') {
+        return;
+    } else {
+        room.currentPlayer = room.currentPlayer === 0 ? 1 : 0;
+    }
 }
 
 function checkWinner(room) {
-    for (let i = 0; i < room.playerHands.length; i++) {
-        const hand = room.playerHands[i];
-        if (hand && hand.length === 0 && room.players[i]) {
-            const winner = room.players[i];
-            io.to(room.roomCode).emit('gameOver', {
-                winnerId: i,
-                winnerName: winner.name
-            });
-            return true;
-        }
+    const winnerIndex = room.playerHands.findIndex(hand => hand.length === 0);
+    if (winnerIndex !== -1) {
+        const winner = room.players[winnerIndex];
+        io.to(room.roomCode).emit('gameOver', {
+            winnerId: winnerIndex,
+            winnerName: winner.name
+        });
+        return true;
     }
     return false;
-}
-
-function broadcastRoomUpdate(room) {
-    const activePlayers = room.players.filter(p => p);
-    io.to(room.roomCode).emit('roomUpdate', {
-        players: room.players,
-        playerCount: activePlayers.length,
-        maxPlayers: room.maxPlayers
-    });
 }
 
 io.on('connection', (socket) => {
@@ -207,23 +154,19 @@ io.on('connection', (socket) => {
 
     socket.on('createRoom', (data) => {
         const roomCode = generateRoomCode();
-        const maxPlayers = Math.min(Math.max(data.maxPlayers || 4, 2), 6);
-        
         const room = {
             roomCode: roomCode,
-            maxPlayers: maxPlayers,
-            players: Array(maxPlayers).fill(null),
+            players: [
+                { name: data.playerName, socketId: socket.id },
+                { name: null, socketId: null }
+            ],
             deck: [],
             discardPile: [],
-            playerHands: Array(maxPlayers).fill(null).map(() => []),
+            playerHands: [[], []],
             currentPlayer: 0,
             currentColor: null,
-            direction: 1,
-            gameStarted: false,
-            hostId: socket.id
+            gameStarted: false
         };
-        
-        room.players[0] = { name: data.playerName, socketId: socket.id };
         
         rooms.set(roomCode, room);
         socket.join(roomCode);
@@ -232,11 +175,8 @@ io.on('connection', (socket) => {
         
         socket.emit('roomCreated', {
             roomCode: roomCode,
-            playerId: 0,
-            maxPlayers: maxPlayers
+            playerId: 0
         });
-        
-        broadcastRoomUpdate(room);
     });
 
     socket.on('joinRoom', (data) => {
@@ -247,66 +187,33 @@ io.on('connection', (socket) => {
             return;
         }
         
-        if (room.gameStarted) {
-            socket.emit('error', { message: 'Oyun zaten başlamış!' });
-            return;
-        }
-        
-        const emptySlot = room.players.findIndex(p => p === null);
-        
-        if (emptySlot === -1) {
+        if (room.players[1].socketId) {
             socket.emit('error', { message: 'Oda dolu!' });
             return;
         }
         
-        room.players[emptySlot] = {
+        room.players[1] = {
             name: data.playerName,
             socketId: socket.id
         };
         
         socket.join(data.roomCode);
         socket.roomCode = data.roomCode;
-        socket.playerId = emptySlot;
+        socket.playerId = 1;
         
         socket.emit('roomJoined', {
             roomCode: data.roomCode,
-            playerId: emptySlot
+            playerId: 1
         });
         
-        broadcastRoomUpdate(room);
+        io.to(data.roomCode).emit('gameStarted');
         
-        const activePlayers = room.players.filter(p => p);
-        if (activePlayers.length === room.maxPlayers) {
-            setTimeout(() => {
-                io.to(data.roomCode).emit('gameStarted');
-                initializeGame(room);
-            }, 1000);
-        }
-    });
-
-    socket.on('startGame', () => {
-        const room = rooms.get(socket.roomCode);
-        
-        if (!room || room.hostId !== socket.id) return;
-        
-        const activePlayers = room.players.filter(p => p);
-        if (activePlayers.length < 2) {
-            socket.emit('error', { message: 'En az 2 oyuncu gerekli!' });
-            return;
-        }
-        
-        io.to(socket.roomCode).emit('gameStarted');
         initializeGame(room);
     });
 
     socket.on('playCard', (data) => {
         const room = rooms.get(socket.roomCode);
         if (!room || room.currentPlayer !== socket.playerId) return;
-        
-        if (!room.playerHands[socket.playerId] || data.cardIndex >= room.playerHands[socket.playerId].length) {
-            socket.emit('error', { message: 'Geçersiz kart!' });
-            return;
-        }
         
         const card = room.playerHands[socket.playerId][data.cardIndex];
         const topCard = room.discardPile[room.discardPile.length - 1];
@@ -326,9 +233,7 @@ io.on('connection', (socket) => {
         handleSpecialCard(room, card);
         
         if (!checkWinner(room)) {
-            if (card.value !== 'skip' && card.value !== 'reverse' && card.value !== '+2' && card.value !== 'wild+4') {
-                nextPlayer(room);
-            }
+            nextTurn(room);
             broadcastGameState(room);
         }
     });
@@ -336,11 +241,6 @@ io.on('connection', (socket) => {
     socket.on('selectColor', (data) => {
         const room = rooms.get(socket.roomCode);
         if (!room || room.currentPlayer !== socket.playerId) return;
-        
-        if (!room.playerHands[socket.playerId] || data.cardIndex >= room.playerHands[socket.playerId].length) {
-            socket.emit('error', { message: 'Geçersiz kart!' });
-            return;
-        }
         
         const card = room.playerHands[socket.playerId][data.cardIndex];
         
@@ -353,9 +253,7 @@ io.on('connection', (socket) => {
         handleSpecialCard(room, card);
         
         if (!checkWinner(room)) {
-            if (card.value !== 'wild+4') {
-                nextPlayer(room);
-            }
+            nextTurn(room);
             broadcastGameState(room);
         }
     });
@@ -364,27 +262,16 @@ io.on('connection', (socket) => {
         const room = rooms.get(socket.roomCode);
         if (!room || room.currentPlayer !== socket.playerId) return;
         
-        if (!room.playerHands[socket.playerId]) return;
-        
         if (room.deck.length === 0) {
             const topCard = room.discardPile.pop();
             room.deck = shuffleDeck(room.discardPile);
             room.discardPile = [topCard];
         }
         
-        if (room.deck.length > 0) {
-            const card = room.deck.pop();
-            room.playerHands[socket.playerId].push(card);
-        }
+        const card = room.deck.pop();
+        room.playerHands[socket.playerId].push(card);
         
-        broadcastGameState(room);
-    });
-
-    socket.on('passCard', () => {
-        const room = rooms.get(socket.roomCode);
-        if (!room || room.currentPlayer !== socket.playerId) return;
-        
-        nextPlayer(room);
+        nextTurn(room);
         broadcastGameState(room);
     });
 
@@ -407,20 +294,8 @@ io.on('connection', (socket) => {
         if (socket.roomCode) {
             const room = rooms.get(socket.roomCode);
             if (room) {
-                const player = room.players[socket.playerId];
-                if (player) {
-                    io.to(socket.roomCode).emit('playerDisconnected', {
-                        playerId: socket.playerId,
-                        playerName: player.name
-                    });
-                    
-                    if (room.gameStarted) {
-                        rooms.delete(socket.roomCode);
-                    } else {
-                        room.players[socket.playerId] = null;
-                        broadcastRoomUpdate(room);
-                    }
-                }
+                io.to(socket.roomCode).emit('playerDisconnected');
+                rooms.delete(socket.roomCode);
             }
         }
     });
