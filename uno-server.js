@@ -275,6 +275,14 @@ io.on('connection', (socket) => {
         broadcastGameState(room);
     });
 
+    socket.on('passTurn', () => {
+        const room = rooms.get(socket.roomCode);
+        if (!room || room.currentPlayer !== socket.playerId) return;
+        
+        nextTurn(room);
+        broadcastGameState(room);
+    });
+
     socket.on('callUno', () => {
         const room = rooms.get(socket.roomCode);
         if (!room) return;

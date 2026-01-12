@@ -228,10 +228,17 @@
         }
 
         .players-info {
+            position: sticky;
+            top: 0;
+            z-index: 100;
             display: flex;
             justify-content: space-between;
             margin-bottom: 30px;
             gap: 20px;
+            background: linear-gradient(135deg, #01092e 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
         }
 
         .player-card {
@@ -241,12 +248,44 @@
             padding: 25px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 20px;
         }
 
         .player-card.active {
             background: linear-gradient(135deg, #FFD93D 0%, #F4D03F 100%);
             transform: scale(1.05);
-            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            box-shadow: 0 0 0 4px rgba(255, 217, 61, 0.5), 0 15px 40px rgba(0,0,0,0.3);
+            animation: glowPulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes glowPulse {
+            0%, 100% { 
+                box-shadow: 0 0 0 4px rgba(255, 217, 61, 0.5), 0 15px 40px rgba(0,0,0,0.3);
+            }
+            50% { 
+                box-shadow: 0 0 0 8px rgba(255, 217, 61, 0.8), 0 0 30px 10px rgba(255, 217, 61, 0.4), 0 15px 40px rgba(0,0,0,0.3);
+            }
+        }
+        
+        .player-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+        
+        .player-info-text {
+            flex: 1;
         }
 
         .player-name {
@@ -463,6 +502,34 @@
             transform: scale(1.1) rotate(-5deg);
             box-shadow: 0 15px 40px rgba(230, 57, 70, 0.6);
         }
+        
+        .pass-button {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #457B9D 0%, #1d3557 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-family: 'Fredoka', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(69, 123, 157, 0.4);
+            transition: all 0.3s;
+            z-index: 100;
+            display: none;
+        }
+        
+        .pass-button.active {
+            display: block;
+        }
+        
+        .pass-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(69, 123, 157, 0.6);
+        }
 
         .winner-screen {
             display: none;
@@ -650,6 +717,19 @@
                 padding: 15px 30px;
                 font-size: 1.5rem;
             }
+            
+            .pass-button {
+                bottom: 15px;
+                left: 15px;
+                padding: 12px 24px;
+                font-size: 1rem;
+            }
+            
+            .player-avatar {
+                width: 50px;
+                height: 50px;
+                font-size: 1.5rem;
+            }
 
             .color-selector {
                 padding: 25px;
@@ -726,12 +806,18 @@
             
             <div class="players-info">
                 <div class="player-card" id="player1Card">
-                    <div class="player-name" id="player1Name">Oyuncu 1</div>
-                    <div class="player-cards-count"><span id="player1Count">0</span> kart</div>
+                    <div class="player-avatar" id="player1Avatar">P1</div>
+                    <div class="player-info-text">
+                        <div class="player-name" id="player1Name">Oyuncu 1</div>
+                        <div class="player-cards-count"><span id="player1Count">0</span> kart</div>
+                    </div>
                 </div>
                 <div class="player-card" id="player2Card">
-                    <div class="player-name" id="player2Name">Oyuncu 2</div>
-                    <div class="player-cards-count"><span id="player2Count">0</span> kart</div>
+                    <div class="player-avatar" id="player2Avatar">P2</div>
+                    <div class="player-info-text">
+                        <div class="player-name" id="player2Name">Oyuncu 2</div>
+                        <div class="player-cards-count"><span id="player2Count">0</span> kart</div>
+                    </div>
                 </div>
             </div>
 
@@ -750,6 +836,7 @@
         </div>
 
         <button class="uno-button" onclick="callUno()">UNO!</button>
+        <button class="pass-button" id="passButton" onclick="passTurn()">Pas Geç ⏭️</button>
     </div>
 
     <div class="color-selector" id="colorSelector">
@@ -882,10 +969,22 @@
         function callUno() {
             socket.emit('callUno');
         }
+        
+        function passTurn() {
+            socket.emit('passTurn');
+        }
 
         function updateUI(state) {
-            document.getElementById('player1Name').textContent = state.players[0]?.name || 'Oyuncu 1';
-            document.getElementById('player2Name').textContent = state.players[1]?.name || 'Oyuncu 2';
+            // Oyuncu isimlerini ve avatarlarını güncelle
+            const player1Name = state.players[0]?.name || 'Oyuncu 1';
+            const player2Name = state.players[1]?.name || 'Oyuncu 2';
+            
+            document.getElementById('player1Name').textContent = player1Name;
+            document.getElementById('player2Name').textContent = player2Name;
+            
+            // Avatar harflerini güncelle
+            document.getElementById('player1Avatar').textContent = player1Name.charAt(0).toUpperCase();
+            document.getElementById('player2Avatar').textContent = player2Name.charAt(0).toUpperCase();
             
             document.getElementById('player1Count').textContent = state.players[0]?.cardCount || 0;
             document.getElementById('player2Count').textContent = state.players[1]?.cardCount || 0;
@@ -902,11 +1001,12 @@
             playerHand.innerHTML = '';
             
             const myCards = state.myHand || [];
+            const isMyTurn = state.currentPlayer === myPlayerId;
+            
             myCards.forEach((card, index) => {
                 const cardElement = document.createElement('div');
                 cardElement.innerHTML = createCardHTML(card);
                 
-                const isMyTurn = state.currentPlayer === myPlayerId;
                 const canPlay = state.playableCards && state.playableCards.includes(index);
                 
                 if (isMyTurn && canPlay) {
@@ -925,8 +1025,16 @@
                 playerHand.appendChild(cardElement);
             });
             
+            // Pas Geç butonunu göster/gizle
+            const passButton = document.getElementById('passButton');
+            if (isMyTurn) {
+                passButton.classList.add('active');
+            } else {
+                passButton.classList.remove('active');
+            }
+            
             const gameStatus = document.getElementById('gameStatus');
-            if (state.currentPlayer === myPlayerId) {
+            if (isMyTurn) {
                 gameStatus.textContent = 'Senin sıran! 🎮';
             } else {
                 const opponentName = state.players[state.currentPlayer]?.name || 'Rakip';
